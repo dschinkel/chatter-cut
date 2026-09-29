@@ -1,6 +1,8 @@
-# Video Voice Remover
+# chatter-cut
 
-![Video Voice Remover app screenshot](docs/images/video-voice-remover.png)
+### Keep the video. Lose the chatter.
+
+![chatter-cut app screenshot](docs/images/video-voice-remover.png)
 
 Remove voices from videos locally on your Mac while preserving the original video stream.
 
