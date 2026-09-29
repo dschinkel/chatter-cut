@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { homedir } from 'node:os'
 
 interface VideoSource {
   codec?: string
@@ -55,9 +56,10 @@ interface ProbeResult {
 
 const app = express()
 const port = 8787
-const root = path.resolve('.local-voice-remover')
+const root = path.join(homedir(), 'Downloads', 'chatter-cut')
 const uploads = path.join(root, 'uploads')
-const outputs = path.join(root, 'outputs')
+const outputs = path.join(root, 'processed-videos')
+const legacyOutputs = path.resolve('.local-voice-remover', 'outputs')
 const work = path.join(root, 'work')
 
 for (const directory of [uploads, outputs, work]) {
@@ -70,6 +72,8 @@ const upload = multer({ dest: uploads })
 const jobs = new Map<string, Job>()
 
 app.use('/outputs', express.static(outputs))
+// Keep previously generated video links working after changing the save folder.
+app.use('/outputs', express.static(legacyOutputs))
 
 function addLog(job: Job, source: string, text: string): void {
   for (const line of text.split(/\r?\n/)) {
@@ -187,7 +191,8 @@ function estimateRequiredFreeBytes(inputBytes: number, durationSeconds?: number)
 
 function checkDiskSpace(job: Job, input: string): void {
   const inputBytes = fs.statSync(input).size
-  const freeBytes = fs.statfsSync(root).bavail * fs.statfsSync(root).bsize
+  const disk = fs.statfsSync(root)
+  const freeBytes = disk.bavail * disk.bsize
   const requiredBytes = estimateRequiredFreeBytes(inputBytes, job.durationSeconds)
   job.diskSpace = { freeBytes, requiredBytes, inputBytes }
   addLog(job, 'disk', `Input ${formatBytes(inputBytes)}; free ${formatBytes(freeBytes)}; estimated processing headroom ${formatBytes(requiredBytes)}.`)

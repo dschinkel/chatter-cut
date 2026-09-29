@@ -108,17 +108,36 @@ Audio is processed separately.
 
 For MOV input, the app keeps MOV output and uses lossless PCM audio. Other supported containers use an appropriate audio codec for that container.
 
+## Saved videos and temporary files
+
+Videos, uploaded source copies, and processing files are stored in the current user's Downloads folder. Finished videos are saved automatically to:
+
+```text
+~/Downloads/chatter-cut/processed-videos/
+```
+
+The app resolves your own home directory and creates this folder if needed; no username is hardcoded. Finished videos keep the source name with a job ID prefix and a `-no-voice` suffix. The **Download** button is also available in the app; your browser controls where that additional copy is saved.
+
+Videos created before this change remain in `.local-voice-remover/outputs/`, and their existing playback and download links continue to work. New finished videos are saved to `~/Downloads/chatter-cut/processed-videos/`.
+
+Restart the app after updating so the server uses the new save location.
+
 ## Large videos and disk space
 
 Large videos can require substantial temporary disk space because the app creates uncompressed audio and AI separation files.
 
-Before AI separation, the app estimates the required working space and checks available disk space.
+Before AI separation, the app estimates the required working space and checks available disk space for both temporary files and the finished video.
 
-Temporary files are stored under:
+Uploaded source copies and temporary audio/AI processing files are stored in subfolders of the same Downloads folder:
 
 ```text
-.local-voice-remover/
+~/Downloads/chatter-cut/uploads/
+~/Downloads/chatter-cut/work/
 ```
+
+Uploaded source copies are deleted when their job finishes. Processing files remain in `work/`. New jobs do not create files in `.local-voice-remover/` inside the project.
+
+If you run out of disk space, delete finished videos you no longer need from `~/Downloads/chatter-cut/processed-videos/`. The app does not automatically delete them. You can also delete temporary files in `~/Downloads/chatter-cut/work/` when no videos are being processed.
 
 ## Environment check
 
