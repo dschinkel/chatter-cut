@@ -12,6 +12,10 @@ Remove voices from videos locally on your Mac while preserving the original vide
 
 Internet access is only needed during installation/update and when the Demucs model must be downloaded.
 
+## Vibe Coded
+
+So don't expect quality code here.
+
 ## Installation — macOS
 
 Open Terminal in this project folder and run:
