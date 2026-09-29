@@ -1,4 +1,4 @@
-# chatter-cut
+# Chatter Cut
 
 ### Keep the video. Lose the chatter.
 
