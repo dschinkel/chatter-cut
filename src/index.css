@@ -39,6 +39,23 @@ button, input { font: inherit; }
   isolation: isolate;
 }
 
+.app-shell[data-background="mono"] {
+  --background: 0 0% 5%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 8%;
+  --card-foreground: 0 0% 98%;
+  --primary: 48 95% 60%;
+  --primary-foreground: 0 0% 7%;
+  --muted: 0 0% 17%;
+  --muted-foreground: 0 0% 68%;
+  --border: 0 0% 22%;
+}
+
+.app-shell[data-background="mono"] .workspace-panel {
+  border-color: rgb(255 255 255 / 12%);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 40%), inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
 .brand-title {
   font-size: clamp(1.75rem, 1.05rem + 2.2vw, 2.75rem);
   font-weight: 700;
@@ -106,6 +123,19 @@ button, input { font: inherit; }
 .background-picker svg {
   width: 16px;
   height: 16px;
+}
+
+.app-shell[data-background="mono"] .background-picker {
+  background: rgb(18 18 18 / 72%);
+}
+
+.app-shell[data-background="mono"] .background-picker button {
+  color: rgb(229 229 229 / 75%);
+}
+
+.app-shell[data-background="mono"] .background-picker button[aria-pressed="true"],
+.app-shell[data-background="mono"] .background-picker button:hover {
+  color: white;
 }
 
 .rainbow-backdrop {
