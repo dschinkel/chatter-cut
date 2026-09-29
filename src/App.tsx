@@ -26,14 +26,15 @@ type Job = {
 
 const labels: Record<Job['status'], string> = { uploading:'Uploading video', queued:'Preparing', probing:'Inspecting source', preflight:'Checking disk space', extracting:'Extracting audio', separating:'Separating voice with AI', filtering:'Filtering foreground voice', muxing:'Rebuilding video', done:'Complete', error:'Failed' }
 const formatEta = (seconds?: number) => seconds == null ? 'Calculating…' : seconds < 60 ? `~${Math.max(1,seconds)} sec remaining` : `~${Math.ceil(seconds/60)} min remaining`
+const BACKGROUND_STORAGE_KEY = 'chatter-cut:background:v2'
 
 export default function App(){
   const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(() => {
-    try { return localStorage.getItem('chatter-cut:background') === 'mono' ? 'mono' : 'color' }
-    catch { return 'color' }
+    try { return localStorage.getItem(BACKGROUND_STORAGE_KEY) === 'color' ? 'color' : 'mono' }
+    catch { return 'mono' }
   })
   useEffect(() => {
-    try { localStorage.setItem('chatter-cut:background', backgroundStyle) } catch {}
+    try { localStorage.setItem(BACKGROUND_STORAGE_KEY, backgroundStyle) } catch {}
   }, [backgroundStyle])
   const [file,setFile]=useState<File|null>(null),[job,setJob]=useState<Job|null>(null),[drag,setDrag]=useState(false),[currentTime,setCurrentTime]=useState(0),[mode,setMode]=useState<'all'|'foreground'>('foreground'),[foregroundRange,setForegroundRange]=useState(25)
   const input=useRef<HTMLInputElement>(null),consoleRef=useRef<HTMLDivElement>(null),videoRef=useRef<HTMLVideoElement>(null),processedVideoRef=useRef<HTMLVideoElement>(null)
