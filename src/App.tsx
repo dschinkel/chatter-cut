@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { BackgroundPicker, type BackgroundStyle } from '@/components/BackgroundPicker'
 import { WaveBackdrop } from '@/components/WaveBackdrop'
+import { VoiceTimeline } from '@/components/VoiceTimeline'
+import type { VoiceSegment } from '@/voice-segments'
 
-type VoiceSegment = { start: number; end: number }
 type Job = {
   id: string
   status: 'uploading'|'queued'|'probing'|'preflight'|'extracting'|'separating'|'filtering'|'muxing'|'done'|'error'
@@ -25,32 +26,6 @@ type Job = {
 
 const labels: Record<Job['status'], string> = { uploading:'Uploading video', queued:'Preparing', probing:'Inspecting source', preflight:'Checking disk space', extracting:'Extracting audio', separating:'Separating voice with AI', filtering:'Filtering foreground voice', muxing:'Rebuilding video', done:'Complete', error:'Failed' }
 const formatEta = (seconds?: number) => seconds == null ? 'Calculating…' : seconds < 60 ? `~${Math.max(1,seconds)} sec remaining` : `~${Math.ceil(seconds/60)} min remaining`
-const formatTime = (seconds: number) => { const s=Math.max(0,Math.floor(seconds)); const m=Math.floor(s/60); return `${m}:${String(s%60).padStart(2,'0')}` }
-
-function VoiceTimeline({ title, subtitle, duration, levels, segments, currentTime, onSeek, pending = false }:{ title:string; subtitle:string; duration:number; levels:number[]; segments:VoiceSegment[]; currentTime:number; onSeek:(seconds:number)=>void; pending?:boolean }) {
-  if (!duration) return <div className="rounded-xl border bg-muted/20 px-4 py-4 text-sm text-muted-foreground">{title} will appear after the audio is analyzed.</div>
-  if (pending || !levels.length) return <div className="rounded-xl border bg-muted/20 px-4 py-4"><div className="mb-2 flex items-center justify-between text-sm"><span className="font-medium">{title}</span><span className="text-muted-foreground">{subtitle}</span></div><div className="h-20 animate-pulse rounded-md bg-muted"/></div>
-  const activeAt=(i:number)=>{const t=(i/levels.length)*duration;return segments.some(s=>t>=s.start&&t<=s.end)}
-  return <div className="rounded-xl border bg-muted/20 p-3">
-    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm"><div><span className="font-medium">{title}</span><span className="ml-2 text-xs text-muted-foreground">{segments.length} detected region{segments.length===1?'':'s'} · {subtitle}</span></div><span className="tabular-nums text-muted-foreground">{formatTime(currentTime)} / {formatTime(duration)}</span></div>
-    <div className="relative h-20 cursor-pointer overflow-hidden rounded-md border bg-background" onClick={e=>{const r=e.currentTarget.getBoundingClientRect();onSeek(((e.clientX-r.left)/r.width)*duration)}}>
-      <div className="absolute inset-0 flex items-center gap-px px-1">{levels.map((level,i)=>{const active=activeAt(i); const h=active?Math.max(10,Math.round(level*82)):3;return <span key={i} className={active?'bg-primary':'bg-muted-foreground/20'} style={{height:`${h}%`,flex:'1 1 0',minWidth:0,borderRadius:2}}/>})}</div>
-      {segments.map((s,i)=><button key={i} type="button" aria-label={`Voice ${formatTime(s.start)} to ${formatTime(s.end)}`} title={`Voice: ${formatTime(s.start)}–${formatTime(s.end)}`} className="absolute inset-y-0 border-x border-primary/30 bg-primary/5 hover:bg-primary/10" style={{left:`${(s.start/duration)*100}%`,width:`${Math.max(.15,((s.end-s.start)/duration)*100)}%`}} onClick={e=>{e.stopPropagation();onSeek(s.start)}}/>)}
-      <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-foreground" style={{left:`${Math.min(100,(currentTime/duration)*100)}%`}}/>
-    </div>
-    <div className="mt-1 flex justify-between text-[10px] tabular-nums text-muted-foreground"><span>0:00</span><span>{formatTime(duration/2)}</span><span>{formatTime(duration)}</span></div>
-  </div>
-}
-
-function ComparisonTimelines({ job, currentTime, onSeek }:{job:Job;currentTime:number;onSeek:(seconds:number)=>void}) {
-  const duration=job.durationSeconds||0
-  const originalLevels=job.originalVoiceLevels||[], originalSegments=job.originalVoiceSegments||[]
-  const processedLevels=job.processedVoiceLevels||[], processedSegments=job.processedVoiceSegments||[]
-  return <div className="space-y-3">
-    <VoiceTimeline title="Original — Voice Detected" subtitle="click to seek" duration={duration} levels={originalLevels} segments={originalSegments} currentTime={currentTime} onSeek={onSeek}/>
-    <VoiceTimeline title="Processed — Voice Remaining" subtitle={job.status==='done'?'same scale as original':'available when processing completes'} duration={duration} levels={processedLevels} segments={processedSegments} currentTime={currentTime} onSeek={onSeek} pending={job.status!=='done'}/>
-  </div>
-}
 
 export default function App(){
   const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(() => {
@@ -85,9 +60,9 @@ export default function App(){
   {job?.status==='done'&&job.outputUrl&&<div className="space-y-3 rounded-xl border bg-muted/10 p-3">
     <div className="flex items-center justify-between"><span className="text-sm font-semibold">Processed video — Voice Removed</span><span className="text-xs text-muted-foreground">generated output</span></div>
     <video ref={processedVideoRef} onTimeUpdate={e=>setCurrentTime(e.currentTarget.currentTime)} className="max-h-[420px] w-full rounded-xl bg-black" controls preload="metadata" src={job.outputUrl}/>
-    <VoiceTimeline title="Processed — Voice Remaining" subtitle="click to seek" duration={job.durationSeconds||0} levels={job.processedVoiceLevels||[]} segments={job.processedVoiceSegments||[]} currentTime={currentTime} onSeek={seekProcessed}/>
+    <VoiceTimeline title="Processed — Voice Changes" subtitle="click to seek" duration={job.durationSeconds||0} levels={job.processedVoiceLevels||[]} segments={job.processedVoiceSegments||[]} original={{levels:job.originalVoiceLevels||[],segments:job.originalVoiceSegments||[]}} currentTime={currentTime} onSeek={seekProcessed}/>
   </div>}
-  {job&&job.status!=='done'&&<VoiceTimeline title="Processed — Voice Remaining" subtitle="available when processing completes" duration={job.durationSeconds||0} levels={[]} segments={[]} currentTime={currentTime} onSeek={()=>{}} pending/>} {job&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3"><div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary"/><span className="text-sm font-medium">Estimated time</span></div><span className="text-sm tabular-nums text-muted-foreground">{job.status==='done'?'Complete':job.status==='error'?'Stopped':formatEta(job.etaSeconds)}</span></div>}
+  {job&&job.status!=='done'&&<VoiceTimeline title="Processed — Voice Changes" subtitle="available when processing completes" duration={job.durationSeconds||0} levels={[]} segments={[]} original={{levels:job.originalVoiceLevels||[],segments:job.originalVoiceSegments||[]}} currentTime={currentTime} onSeek={()=>{}} pending/>} {job&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3"><div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary"/><span className="text-sm font-medium">Estimated time</span></div><span className="text-sm tabular-nums text-muted-foreground">{job.status==='done'?'Complete':job.status==='error'?'Stopped':formatEta(job.etaSeconds)}</span></div>}
   {!job&&<Button className="w-full" size="lg" onClick={process}><AudioLines/>Remove Voice</Button>}
   {job&&job.status!=='done'&&job.status!=='error'&&<div className="py-3" aria-live="polite"><div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-primary"/><span className="font-medium">{labels[job.status]}</span></div><span className="text-sm text-muted-foreground">{job.progress}%</span></div><Progress value={job.progress}/><p className="mt-3 text-sm text-muted-foreground">{job.message}</p></div>}
   {job?.status==='error'&&<div className="rounded-xl border border-red-900/60 bg-red-950/30 p-5"><div className="mb-2 flex items-center gap-2"><AlertTriangle className="h-5 w-5"/><span className="rounded-full border px-2.5 py-1 text-xs font-semibold">{job.friendlyError?.tag||'Processing failed'}</span></div><p className="text-sm">{job.friendlyError?.message||'The video could not be processed. Check the processing console for details.'}</p><Button className="mt-4" variant="outline" onClick={reset}>Start over</Button></div>}

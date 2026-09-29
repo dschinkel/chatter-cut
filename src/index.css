@@ -88,6 +88,51 @@ button, input { font: inherit; }
   text-wrap: balance;
 }
 
+.voice-key-remaining,
+.voice-timeline-bar[data-voice="remaining"] {
+  background: #d4d4d4;
+}
+
+.voice-key-removed {
+  background: linear-gradient(90deg, #ff3c75, #ff9139, #ffdd4a, #30e091, #2ecbff, #4c6eff, #a44bff);
+}
+
+.voice-timeline-bar[data-voice="removed"] {
+  background: hsl(var(--voice-hue) 95% 65%);
+}
+
+.voice-timeline-region[data-voice="remaining"] {
+  border-color: rgb(212 212 212 / 30%);
+  background: rgb(212 212 212 / 5%);
+}
+
+.voice-timeline-region[data-voice="remaining"]:hover {
+  background: rgb(212 212 212 / 10%);
+}
+
+.voice-timeline-region[data-voice="removed"] {
+  border-color: hsl(var(--voice-hue) 95% 65% / 35%);
+  background: hsl(var(--voice-hue) 95% 65% / 6%);
+}
+
+.voice-timeline-region[data-voice="removed"]:hover {
+  background: hsl(var(--voice-hue) 95% 65% / 12%);
+}
+
+.app-shell[data-background="mono"] .voice-key-removed,
+.app-shell[data-background="mono"] .voice-timeline-bar[data-voice="removed"] {
+  background: hsl(var(--primary));
+}
+
+.app-shell[data-background="mono"] .voice-timeline-region[data-voice="removed"] {
+  border-color: hsl(var(--primary) / 35%);
+  background: hsl(var(--primary) / 6%);
+}
+
+.app-shell[data-background="mono"] .voice-timeline-region[data-voice="removed"]:hover {
+  background: hsl(var(--primary) / 12%);
+}
+
 .background-picker {
   display: inline-flex;
   gap: 4px;
