@@ -1,0 +1,48 @@
+{
+  "name": "local-voice-remover",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=26 <27",
+    "pnpm": ">=10 <11"
+  },
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"tsx server/index.ts\"",
+    "client": "vite",
+    "server": "tsx server/index.ts",
+    "build": "tsc -b && vite build",
+    "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "predev": "node scripts/doctor.mjs --quick"
+  },
+  "dependencies": {
+    "@radix-ui/react-progress": "latest",
+    "@radix-ui/react-slot": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "express": "latest",
+    "lucide-react": "latest",
+    "multer": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwind-merge": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "latest",
+    "@types/express": "latest",
+    "@types/multer": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "autoprefixer": "latest",
+    "concurrently": "latest",
+    "postcss": "latest",
+    "tailwindcss": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "packageManager": "pnpm@10.32.1"
+}

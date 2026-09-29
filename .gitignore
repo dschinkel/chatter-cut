@@ -1,0 +1,11 @@
+node_modules
+dist
+.local-voice-remover
+.DS_Store
+.venv/
+.local-voice-remover/
+.idea/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
