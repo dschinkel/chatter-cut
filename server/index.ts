@@ -25,6 +25,8 @@ interface Job {
   source?: VideoSource
   videoPreserved?: boolean
   outputUrl?: string
+  previewUrl?: string
+  previewStatus?: 'preparing' | 'ready' | 'error'
   error?: string
   logs: string[]
   startedAt: number
@@ -59,10 +61,11 @@ const port = 8787
 const root = path.join(homedir(), 'Downloads', 'chatter-cut')
 const uploads = path.join(root, 'uploads')
 const outputs = path.join(root, 'processed-videos')
+const previews = path.join(root, 'previews')
 const legacyOutputs = path.resolve('.local-voice-remover', 'outputs')
 const work = path.join(root, 'work')
 
-for (const directory of [uploads, outputs, work]) {
+for (const directory of [uploads, outputs, previews, work]) {
   fs.mkdirSync(directory, { recursive: true })
 }
 
@@ -72,6 +75,7 @@ const upload = multer({ dest: uploads })
 const jobs = new Map<string, Job>()
 
 app.use('/outputs', express.static(outputs))
+app.use('/previews', express.static(previews))
 // Keep previously generated video links working after changing the save folder.
 app.use('/outputs', express.static(legacyOutputs))
 
@@ -179,14 +183,16 @@ function formatBytes(bytes: number): string {
 function estimateRequiredFreeBytes(inputBytes: number, durationSeconds?: number): number {
   // The multipart upload already exists on disk when this runs. Reserve space for:
   // extracted 44.1 kHz stereo PCM, Demucs working/output stems, the final mux,
+  // a smaller browser preview,
   // model/runtime scratch space, plus a safety margin.
   const pcmBytes = durationSeconds && durationSeconds > 0
     ? durationSeconds * 44100 * 2 * 2
     : inputBytes * 0.20
   const demucsWorking = Math.max(pcmBytes * 5, inputBytes * 0.30)
   const finalMux = inputBytes * 1.05
+  const browserPreview = Math.max(inputBytes * 0.12, (durationSeconds || 0) * 400000)
   const fixedSafety = 2 * 1024 ** 3
-  return Math.ceil(pcmBytes + demucsWorking + finalMux + fixedSafety)
+  return Math.ceil(pcmBytes + demucsWorking + finalMux + browserPreview + fixedSafety)
 }
 
 function checkDiskSpace(job: Job, input: string): void {
@@ -208,6 +214,7 @@ async function processJob(job: Job, input: string, originalName: string, mode: '
   const separated = path.join(directory, 'separated')
   job.mode = mode
   job.foregroundRange = foregroundRange
+  let previewTask: Promise<void> | undefined
 
   try {
     setStage(job, { status: 'probing', progress: 5, message: 'Reading source video quality…' })
@@ -241,6 +248,26 @@ async function processJob(job: Job, input: string, originalName: string, mode: '
 
     setStage(job, { status: 'preflight', progress: 8, message: 'Checking available disk space…' })
     checkDiskSpace(job, input)
+
+    // A local MOV may contain HEVC or other streams that a browser cannot play
+    // reliably. Make a small H.264/AAC copy for the in-app source player while
+    // the original stream remains untouched for the final output.
+    job.previewStatus = 'preparing'
+    const previewName = `${job.id}-original-preview.mp4`
+    const previewPath = path.join(previews, previewName)
+    previewTask = run(job, 'ffmpeg', [
+      '-y', '-loglevel', 'error', '-i', input, '-map', '0:v:0', '-map', '0:a:0?',
+      '-vf', 'fps=24,scale=960:-2', '-c:v', 'libx264', '-preset', 'ultrafast',
+      '-crf', '29', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k',
+      '-movflags', '+faststart', previewPath,
+    ], undefined, 'ffmpeg-preview').then(() => {
+      job.previewUrl = `/previews/${previewName}`
+      job.previewStatus = 'ready'
+    }).catch((error: unknown) => {
+      job.previewStatus = 'error'
+      try { fs.unlinkSync(previewPath) } catch { /* no partial preview */ }
+      addLog(job, 'preview', `Browser preview failed: ${error instanceof Error ? error.message : String(error)}`)
+    })
 
     setStage(job, { status: 'extracting', progress: 10, message: 'Extracting the audio track…' })
     await run(job, 'ffmpeg', ['-y', '-i', input, '-vn', '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', wav])
@@ -357,6 +384,8 @@ async function processJob(job: Job, input: string, originalName: string, mode: '
       : { tag: 'Processing failed', message: 'The video could not be processed. Check the processing console for the technical details.' }
     setStage(job, { status: 'error', message: 'Processing failed', error: raw, friendlyError })
   } finally {
+    // FFmpeg must finish reading the uploaded source before it can be removed.
+    await previewTask
     try { fs.unlinkSync(input) } catch { /* already removed */ }
   }
 }

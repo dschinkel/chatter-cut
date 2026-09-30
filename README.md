@@ -108,6 +108,8 @@ The video stream is copied instead of re-encoded where the output container supp
 
 Audio is processed separately.
 
+The app also creates a smaller H.264/AAC preview of the original video for browser playback. If the browser stalls on a large or unsupported MOV, it switches to that preview when ready. The final download still uses the original video stream.
+
 For MOV input, the app keeps MOV output and uses lossless PCM audio. Other supported containers use an appropriate audio codec for that container.
 
 ## Saved videos and temporary files
@@ -135,9 +137,10 @@ Uploaded source copies and temporary audio/AI processing files are stored in sub
 ```text
 ~/Downloads/chatter-cut/uploads/
 ~/Downloads/chatter-cut/work/
+~/Downloads/chatter-cut/previews/
 ```
 
-Uploaded source copies are deleted when their job finishes. Processing files remain in `work/`. New jobs do not create files in `.local-voice-remover/` inside the project.
+Uploaded source copies are deleted after processing and preview creation finish. Processing files remain in `work/`, and browser previews remain in `previews/`. New jobs do not create files in `.local-voice-remover/` inside the project.
 
 If you run out of disk space, delete finished videos you no longer need from `~/Downloads/chatter-cut/processed-videos/`. The app does not automatically delete them. You can also delete temporary files in `~/Downloads/chatter-cut/work/` when no videos are being processed.
 
