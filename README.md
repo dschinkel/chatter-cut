@@ -1,5 +1,7 @@
 # Chatter Cut
 
+[![Release version](https://img.shields.io/github/v/release/dschinkel/chatter-cut?display_name=tag&style=flat&color=yellow)](https://github.com/dschinkel/chatter-cut/releases/latest)
+
 ### Keep the video. Lose the chatter.
 
 ![Chatter Cut app screenshot](docs/images/chatter-cut.png)
@@ -204,6 +206,22 @@ This project therefore controls its runtime instead of automatically using whate
 - `uv.lock` controls Python dependency resolution when present.
 
 This avoids a system Python, global Demucs installation, or unrelated package update silently changing the processing environment.
+
+## Releases and semantic versioning
+
+Every push to `main` runs the tests and production build, then publishes a GitHub release with a `vMAJOR.MINOR.PATCH` tag and notes listing the pushed changes. The badge at the top of this README shows the latest published version and links to its release.
+
+The first release uses the initial version in `package.json` (`1.1.0`). After that, Git tags are the source of truth for application release versions; the private package version remains the initial baseline.
+
+| Commit message | Version change | Example |
+| --- | --- | --- |
+| `feat: ...` or `feat(scope): ...` | Minor | `v1.1.0` → `v1.2.0` |
+| `feat!: ...`, `fix(scope)!: ...`, or a `BREAKING CHANGE:` footer | Major | `v1.2.0` → `v2.0.0` |
+| All other changes, including fixes and documentation | Patch | `v1.1.0` → `v1.1.1` |
+
+When a push contains several commits, the largest required bump wins. Feature branches do not publish releases until their changes reach `main`. Releases are queued to avoid conflicting version numbers. Rerunning a completed release workflow reuses its existing tag.
+
+Run `pnpm release:version` to preview the next release tag without publishing. If a release fails, fix the failing test/build or rerun the **Release** workflow in GitHub Actions. Publishing uses GitHub's built-in token; no extra release secret is required.
 
 ## Troubleshooting
 

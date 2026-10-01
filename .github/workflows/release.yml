@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Keep pushes queued while a release is publishing.
+concurrency:
+  group: releases-main
+  queue: max
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies
+        run: |
+          npm install --global pnpm@10.32.1
+          pnpm install --frozen-lockfile
+      - name: Test and build
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --yes ffmpeg
+          fi
+          pnpm test
+          pnpm build
+      - name: Choose release version
+        id: version
+        env:
+          RELEASE_BEFORE: ${{ github.event.before }}
+          RELEASE_NOTES_PATH: ${{ runner.temp }}/release-notes.md
+        run: |
+          git fetch origin --tags
+          node scripts/release-version.mjs
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "$RELEASE_TAG is already published."
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --latest
+          fi

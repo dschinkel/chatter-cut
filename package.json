@@ -12,7 +12,8 @@
     "client": "vite",
     "server": "tsx server/index.ts",
     "build": "tsc -b && vite build",
-    "test": "node --test tests/*.test.ts",
+    "test": "node --test tests/*.test.ts tests/*.test.mjs",
+    "release:version": "node scripts/release-version.mjs",
     "setup": "node scripts/setup.mjs",
     "doctor": "node scripts/doctor.mjs",
     "predev": "node scripts/doctor.mjs --quick"
