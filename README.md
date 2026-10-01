@@ -1,6 +1,6 @@
 # Chatter Cut
 
-[![Release version](https://img.shields.io/github/v/release/dschinkel/chatter-cut?display_name=tag&style=flat&color=yellow)](https://github.com/dschinkel/chatter-cut/releases/latest)
+[![Release version](https://img.shields.io/github/v/release/dschinkel/chatter-cut.svg?style=flat&color=yellow)](https://github.com/dschinkel/chatter-cut/releases/latest)
 
 ### Keep the video. Lose the chatter.
 
