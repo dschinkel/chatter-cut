@@ -467,13 +467,20 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, audioProcessingVersio
 // Keep an explicit reference to the HTTP server and keep stdin referenced while
 // running under `tsx` + `concurrently`. This prevents the API process from
 // silently falling through after startup in development.
-const server = app.listen(port, '127.0.0.1', () => {
+const server = app.listen(port, '127.0.0.1')
+
+server.on('listening', () => {
   console.log(`Local Voice Remover API: http://localhost:${port}`)
 })
 
 server.on('error', (error) => {
   console.error('[server] HTTP server error:', error)
-  process.exitCode = 1
+  if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+    console.error('[server] Another Chatter Cut processor is already using port 8787. Stop the existing app before starting another copy.')
+  }
+  // stdin is kept open below, so setting exitCode alone would leave a failed
+  // API alive and let the second UI connect to the older processor.
+  process.exit(1)
 })
 
 server.on('close', () => {
