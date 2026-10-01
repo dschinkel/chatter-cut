@@ -94,7 +94,7 @@ After it completes:
 
 Uses the **Foreground Voice Range** control to remove the more prominent portion of the separated vocal signal while retaining quieter vocal material where possible.
 
-The slider starts at **60%**, the suggested starting point for voices that are very loud or close to the camera. Adjust up if the voice you want to remove remains, or down if voices you want to keep are being removed.
+The slider starts at **75%**, the suggested starting point for voices that are very loud or close to the camera. Adjust up if the voice you want to remove remains, or down if voices you want to keep are being removed.
 
 The control estimates **voice prominence**, not literal physical distance from the camera. A single mixed microphone recording cannot reliably determine that a speaker is a specific number of feet away.
 

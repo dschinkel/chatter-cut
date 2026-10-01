@@ -400,8 +400,8 @@ app.post('/api/remove-voice', (req, res, next) => {
     jobs.set(id, job)
     res.json(job)
     const mode = req.body.mode === 'all' ? 'all' : 'foreground'
-    const requestedRange = Number(req.body.foregroundRange ?? 60)
-    const foregroundRange = Number.isFinite(requestedRange) ? Math.max(0, Math.min(100, requestedRange)) : 60
+    const requestedRange = Number(req.body.foregroundRange ?? 75)
+    const foregroundRange = Number.isFinite(requestedRange) ? Math.max(0, Math.min(100, requestedRange)) : 75
     void processJob(job, req.file.path, req.file.originalname, mode, foregroundRange)
   })
 })
