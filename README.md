@@ -114,7 +114,7 @@ Both modes also reduce little camera handling clicks by repairing short audio im
 
 ### Wind rumble
 
-Enable **Reduce wind rumble** before processing to look for sustained, irregular low-frequency energy typical of microphone wind noise. When detected, the app reduces the band below 180 Hz in those sections and reports how much likely rumble it found. The option is off by default.
+Turn **Wind detection & removal** to **On** before processing to look for sustained, irregular low-frequency energy typical of microphone wind noise. Click anywhere on the wind settings card to toggle it; its switch and On/Off label show the selected state. When detected, the app reduces the band below 180 Hz in those sections and reports how much likely rumble it found. The option is off by default.
 
 This is a heuristic and can also identify other rumble. It reduces wind noise rather than guaranteeing full removal, and cannot recover audio obscured by severe wind or microphone distortion. [Knowles' microphone wind noise note](https://www.knowles.com/docs/default-source/default-document-library/an-21-microphone-wind-noise.pdf) explains why low-frequency filtering can help and the tradeoff in audio bandwidth.
 
