@@ -103,20 +103,20 @@ button, input { font: inherit; }
 
 .voice-timeline-region[data-voice="remaining"] {
   border-color: rgb(212 212 212 / 30%);
-  background: rgb(212 212 212 / 5%);
+  background: rgb(212 212 212 / 50%);
 }
 
 .voice-timeline-region[data-voice="remaining"]:hover {
-  background: rgb(212 212 212 / 10%);
+  background: rgb(212 212 212 / 80%);
 }
 
 .voice-timeline-region[data-voice="removed"] {
   border-color: hsl(var(--voice-hue) 95% 65% / 35%);
-  background: hsl(var(--voice-hue) 95% 65% / 6%);
+  background: hsl(var(--voice-hue) 95% 65% / 75%);
 }
 
 .voice-timeline-region[data-voice="removed"]:hover {
-  background: hsl(var(--voice-hue) 95% 65% / 12%);
+  background: hsl(var(--voice-hue) 95% 65% / 95%);
 }
 
 .app-shell[data-background="mono"] .voice-key-removed,
@@ -126,11 +126,11 @@ button, input { font: inherit; }
 
 .app-shell[data-background="mono"] .voice-timeline-region[data-voice="removed"] {
   border-color: hsl(var(--primary) / 35%);
-  background: hsl(var(--primary) / 6%);
+  background: hsl(var(--primary) / 75%);
 }
 
 .app-shell[data-background="mono"] .voice-timeline-region[data-voice="removed"]:hover {
-  background: hsl(var(--primary) / 12%);
+  background: hsl(var(--primary) / 95%);
 }
 
 .background-picker {

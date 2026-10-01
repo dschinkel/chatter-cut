@@ -5,6 +5,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { homedir } from 'node:os'
+import { buildForegroundControl, CAMERA_CLICK_FILTER, encodeGainWave, FOREGROUND_FILTER, readVocalRms } from './foreground-audio.ts'
+import { AUDIO_PROCESSING_VERSION } from '../src/audio-processing-version.ts'
+import { analyzeWindRumble, WIND_FILTER } from './wind-audio.ts'
 
 interface VideoSource {
   codec?: string
@@ -40,6 +43,9 @@ interface Job {
   diskSpace?: { freeBytes: number; requiredBytes: number; inputBytes: number }
   mode?: 'all' | 'foreground'
   foregroundRange?: number
+  windReduction?: boolean
+  windDetected?: boolean
+  windSeconds?: number
 }
 
 interface ProbeResult {
@@ -119,7 +125,7 @@ function run(job: Job, command: string, args: string[], onLine?: (line: string) 
 }
 
 
-function analyzeVocalWaveform(file: string, duration: number, targetBins = 1200): { levels: number[]; segments: Array<{ start: number; end: number }>; peak: number; noise: number; threshold: number } {
+function analyzeVocalWaveform(file: string, duration: number, targetBins = 1200, reference?: { peak: number; threshold: number }): { levels: number[]; segments: Array<{ start: number; end: number }>; peak: number; noise: number; threshold: number } {
   const buffer = fs.readFileSync(file)
   if (buffer.toString('ascii', 0, 4) !== 'RIFF' || buffer.toString('ascii', 8, 12) !== 'WAVE') throw new Error('Unsupported vocal WAV format')
   let offset = 12, format = 1, channels = 2, bits = 16, dataStart = -1, dataSize = 0
@@ -153,8 +159,8 @@ function analyzeVocalWaveform(file: string, duration: number, targetBins = 1200)
   const peak = Math.max(...rms, 0.000001)
   // Vocal stems can be quiet, especially for field/sports recordings. Use an adaptive
   // floor instead of requiring a fixed 0.003 RMS signal.
-  const threshold = Math.max(0.00015, noise * 2.0, peak * 0.012)
-  const levels = rms.map(v => Math.max(0, Math.min(1, v / peak)))
+  const threshold = reference?.threshold ?? Math.max(0.00015, noise * 2.0, peak * 0.012)
+  const levels = rms.map(v => Math.max(0, Math.min(1, v / (reference?.peak ?? peak))))
   const active = rms.map(v => v >= threshold)
   // Fill very short gaps and remove isolated blips.
   for (let i=1;i<active.length-1;i++) if (!active[i] && active[i-1] && active[i+1]) active[i]=true
@@ -207,13 +213,14 @@ function checkDiskSpace(job: Job, input: string): void {
   }
 }
 
-async function processJob(job: Job, input: string, originalName: string, mode: 'all' | 'foreground', foregroundRange: number): Promise<void> {
+async function processJob(job: Job, input: string, originalName: string, mode: 'all' | 'foreground', foregroundRange: number, windReduction: boolean): Promise<void> {
   const directory = path.join(work, job.id)
   fs.mkdirSync(directory, { recursive: true })
   const wav = path.join(directory, 'input.wav')
   const separated = path.join(directory, 'separated')
   job.mode = mode
   job.foregroundRange = foregroundRange
+  job.windReduction = windReduction
   let previewTask: Promise<void> | undefined
 
   try {
@@ -281,14 +288,16 @@ async function processJob(job: Job, input: string, originalName: string, mode: '
     const noVocals = path.join(separated, 'htdemucs', 'input', 'no_vocals.wav')
     const vocals = path.join(separated, 'htdemucs', 'input', 'vocals.wav')
     if (!fs.existsSync(noVocals)) throw new Error('Demucs finished but no_vocals.wav was not found.')
+    const analysisWav = path.join(directory, 'vocals-analysis-pcm16.wav')
+    let originalAnalysis: ReturnType<typeof analyzeVocalWaveform> | undefined
 
     // Demucs may emit IEEE-float/WAVE_EXTENSIBLE stems. Normalize the vocal stem to
     // a known PCM16 format before analysis so timeline detection never depends on the
     // exact WAV encoding produced by Demucs/torchaudio.
     if (fs.existsSync(vocals) && job.durationSeconds) {
-      const analysisWav = path.join(directory, 'vocals-analysis-pcm16.wav')
-      await run(job, 'ffmpeg', ['-y', '-i', vocals, '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', analysisWav], undefined, 'ffmpeg-analysis')
+      await run(job, 'ffmpeg', ['-y', '-i', vocals, '-ac', '2', '-ar', '16000', '-c:a', 'pcm_s16le', analysisWav], undefined, 'ffmpeg-analysis')
       const analysis = analyzeVocalWaveform(analysisWav, job.durationSeconds)
+      originalAnalysis = analysis
       job.originalVoiceLevels = analysis.levels
       job.originalVoiceSegments = analysis.segments
       job.processedVoiceLevels = analysis.levels.map(() => 0)
@@ -304,27 +313,48 @@ async function processJob(job: Job, input: string, originalName: string, mode: '
     if (mode === 'foreground') {
       setStage(job, { status: 'filtering', progress: 84, message: `Removing the closest/most prominent voice range (${foregroundRange}%)…` })
       const foregroundAudio = path.join(directory, 'foreground-filtered.wav')
-      // A mono/stereo recording cannot reveal literal physical distance. The range dial therefore
-      // controls prominence: at low values only very strong vocal energy is subtracted; as the
-      // value increases, progressively quieter vocal energy is included. Demucs' non-vocal stem
-      // is left untouched.
-      const thresholdDb = -10 - (foregroundRange * 0.40) // 0%=-10 dB, 25%=-20 dB, 100%=-50 dB
-      const thresholdLinear = Math.pow(10, thresholdDb / 20)
-      const filter = `[1:a]asplit=2[vocal][gatein];[gatein]agate=threshold=${thresholdLinear.toFixed(6)}:ratio=20:attack=15:release=300,volume=-0.96[remove];[vocal][remove]amix=inputs=2:normalize=0[kept];[0:a][kept]amix=inputs=2:normalize=0,alimiter=limit=0.98[out]`
-      await run(job, 'ffmpeg', ['-y', '-i', noVocals, '-i', vocals, '-filter_complex', filter, '-map', '[out]', '-c:a', 'pcm_s24le', foregroundAudio], undefined, 'ffmpeg-foreground')
+      // Keep quiet syllables suppressed throughout each prominent phrase. Both
+      // channels share a gain envelope calibrated to this recording's vocal RMS.
+      if (!fs.existsSync(analysisWav)) {
+        await run(job, 'ffmpeg', ['-y', '-i', vocals, '-ac', '2', '-ar', '16000', '-c:a', 'pcm_s16le', analysisWav], undefined, 'ffmpeg-analysis')
+      }
+      const detector = readVocalRms(fs.readFileSync(analysisWav))
+      const control = buildForegroundControl(detector.rms, foregroundRange, detector.frameSeconds)
+      const gainWav = path.join(directory, 'foreground-gain.wav')
+      const retainedWav = path.join(directory, 'retained-vocals-analysis-pcm16.wav')
+      fs.writeFileSync(gainWav, encodeGainWave(control.gains, detector.duration, detector.frameSeconds))
+      await run(job, 'ffmpeg', [
+        '-y', '-i', noVocals, '-i', vocals, '-i', gainWav,
+        '-filter_complex', FOREGROUND_FILTER,
+        '-map', '[out]', '-c:a', 'pcm_s24le', foregroundAudio,
+        '-map', '[analysis]', '-ac', '2', '-ar', '16000', '-c:a', 'pcm_s16le', retainedWav,
+      ], undefined, 'ffmpeg-foreground')
       cleanedAudio = foregroundAudio
-      addLog(job, 'foreground', `Range ${foregroundRange}% => prominence threshold ${thresholdDb.toFixed(1)} dB. Strong vocal energy above this gate is suppressed; quieter vocal energy is retained.`)
-      if (job.originalVoiceLevels?.length) {
-        const cutoff = Math.max(0.04, 0.98 - foregroundRange * 0.0092)
-        job.processedVoiceLevels = job.originalVoiceLevels.map(v => v >= cutoff ? v * 0.04 : v)
-        job.processedVoiceSegments = job.originalVoiceSegments?.filter(seg => {
-          const mid=(seg.start+seg.end)/2, i=Math.min(job.originalVoiceLevels!.length-1, Math.floor((mid/(job.durationSeconds||1))*job.originalVoiceLevels!.length))
-          return (job.originalVoiceLevels![i]||0) < cutoff
-        }) || []
+      addLog(job, 'foreground', `Range ${foregroundRange}% => adaptive phrase threshold ${control.thresholdDb.toFixed(1)} dB; suppressing ${control.suppressedSeconds.toFixed(1)} seconds of vocal audio, including phrase starts and tails.`)
+      if (originalAnalysis && job.durationSeconds) {
+        const retained = analyzeVocalWaveform(retainedWav, job.durationSeconds, 1200, originalAnalysis)
+        job.processedVoiceLevels = retained.levels
+        job.processedVoiceSegments = retained.segments
       }
     }
 
-    setStage(job, { status: 'muxing', progress: 88, message: 'Putting the cleaned audio back into the original video…' })
+    let windGainWav: string | undefined
+    if (windReduction) {
+      setStage(job, { status: 'filtering', progress: 86, message: 'Checking for likely wind rumble…' })
+      const windAnalysisWav = path.join(directory, 'wind-analysis-pcm16.wav')
+      await run(job, 'ffmpeg', ['-y', '-loglevel', 'error', '-i', wav, '-ac', '2', '-ar', '8000', '-c:a', 'pcm_s16le', windAnalysisWav], undefined, 'ffmpeg-wind-analysis')
+      const wind = analyzeWindRumble(fs.readFileSync(windAnalysisWav))
+      job.windDetected = wind.detectedSeconds > 0
+      job.windSeconds = wind.detectedSeconds
+      if (job.windDetected) {
+        windGainWav = path.join(directory, 'wind-gain.wav')
+        fs.writeFileSync(windGainWav, encodeGainWave(wind.gains, wind.duration, wind.frameSeconds))
+      }
+      addLog(job, 'wind', `${wind.detectedSeconds.toFixed(1)} seconds of likely wind rumble detected. Reducing the low-frequency band only in those intervals.`)
+    }
+
+    setStage(job, { status: 'muxing', progress: 88, message: windGainWav?'Reducing wind rumble, removing camera clicks, and rebuilding the video…':'Removing camera clicks and rebuilding the video…' })
+    addLog(job, 'cleanup', 'Repairing short camera clicks with an impulse filter before saving the audio.')
     const parsedName = path.parse(originalName)
     const safeName = parsedName.name.replace(/[^a-z0-9_-]+/gi, '_')
     // Preserve the source container instead of forcing every result to MP4.
@@ -337,10 +367,15 @@ async function processJob(job: Job, input: string, originalName: string, mode: '
 
     const muxArgs = [
       '-y', '-i', input, '-i', cleanedAudio,
-      '-map', '0:v:0', '-map', '1:a:0',
+    ]
+    if (windGainWav) muxArgs.push('-i', windGainWav)
+    muxArgs.push(
+      '-map', '0:v:0', '-map', windGainWav?'[clean]':'1:a:0',
       '-map_metadata', '0', '-map_chapters', '0',
       '-c:v', 'copy',
-    ]
+    )
+    if (windGainWav) muxArgs.push('-filter_complex', `${WIND_FILTER};[windclean]${CAMERA_CLICK_FILTER},alimiter=limit=0.98:level=0:latency=1[clean]`)
+    else muxArgs.push('-af', CAMERA_CLICK_FILTER)
 
     if (outputExt === '.mov') {
       // The audio has to be regenerated because it is the part we changed, but
@@ -396,13 +431,14 @@ app.post('/api/remove-voice', (req, res, next) => {
     if (!req.file) return res.status(400).json({ error: 'No video uploaded.' })
 
     const id = crypto.randomUUID()
-    const job: Job = { id, status: 'queued', progress: 2, message: 'Preparing video…', logs: [], startedAt: Date.now() }
-    jobs.set(id, job)
-    res.json(job)
     const mode = req.body.mode === 'all' ? 'all' : 'foreground'
     const requestedRange = Number(req.body.foregroundRange ?? 75)
     const foregroundRange = Number.isFinite(requestedRange) ? Math.max(0, Math.min(100, requestedRange)) : 75
-    void processJob(job, req.file.path, req.file.originalname, mode, foregroundRange)
+    const windReduction = req.body.windReduction === 'true'
+    const job: Job = { id, status: 'queued', progress: 2, message: 'Preparing video…', logs: [], startedAt: Date.now(), mode, foregroundRange, windReduction }
+    jobs.set(id, job)
+    res.json(job)
+    void processJob(job, req.file.path, req.file.originalname, mode, foregroundRange, windReduction)
   })
 })
 
@@ -426,7 +462,7 @@ app.get('/api/jobs/:id', (req, res) => {
   res.json(job)
 })
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }))
+app.get('/api/health', (_req, res) => res.json({ ok: true, audioProcessingVersion: AUDIO_PROCESSING_VERSION }))
 
 // Keep an explicit reference to the HTTP server and keep stdin referenced while
 // running under `tsx` + `concurrently`. This prevents the API process from

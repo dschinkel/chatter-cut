@@ -94,13 +94,27 @@ After it completes:
 
 Uses the **Foreground Voice Range** control to remove the more prominent portion of the separated vocal signal while retaining quieter vocal material where possible.
 
+The threshold adapts to each recording's vocal levels. Once a prominent phrase is detected, suppression includes its onset, quiet syllables, brief pauses, and tail so parts of nearby speech do not leak back in. The processed timeline measures the vocal audio retained in the mix using the original timeline's scale.
+
 The slider starts at **75%**, the suggested starting point for voices that are very loud or close to the camera. Adjust up if the voice you want to remove remains, or down if voices you want to keep are being removed.
+
+Your last dial setting is remembered in this browser. The selected range stays visible in the applied settings summary during processing and on the finished result.
+
+The processed timeline defaults to the **remaining** detected voice waveform at the same scale as the original. Switch to **Removed voice** to see the difference, or enable **Overlay original** for a faint outline comparison. The colored strip below the waveform marks removed intervals; it does not represent voice still present. Region counts refer to audio above the detection threshold, so quiet residual voice can still exist when the count is zero.
 
 The control estimates **voice prominence**, not literal physical distance from the camera. A single mixed microphone recording cannot reliably determine that a speaker is a specific number of feet away.
 
 ### Remove all voices
 
 Uses the full Demucs `no_vocals` stem to remove detected vocal content as aggressively as possible.
+
+Both modes also reduce little camera handling clicks by repairing short audio impulses from neighboring samples. This targets brief clicks while preserving continuous high-pitched sounds.
+
+### Wind rumble
+
+Enable **Reduce wind rumble** before processing to look for sustained, irregular low-frequency energy typical of microphone wind noise. When detected, the app reduces the band below 180 Hz in those sections and reports how much likely rumble it found. The option is off by default.
+
+This is a heuristic and can also identify other rumble. It reduces wind noise rather than guaranteeing full removal, and cannot recover audio obscured by severe wind or microphone distortion. [Knowles' microphone wind noise note](https://www.knowles.com/docs/default-source/default-document-library/an-21-microphone-wind-noise.pdf) explains why low-frequency filtering can help and the tradeoff in audio bandwidth.
 
 ## Video quality
 

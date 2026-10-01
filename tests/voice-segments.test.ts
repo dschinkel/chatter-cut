@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getRemovedVoiceSegments } from '../src/voice-segments.ts'
+import { getRemovedVoiceSegments, getVocalEnergyReduction, getVoiceComparisonLevels } from '../src/voice-segments.ts'
+
+test('processed waveform plots the remaining level and keeps the removed level separate', () => {
+  assert.deepEqual(getVoiceComparisonLevels([0, 0.1, 0.8], [1, 0.5, 0.6]), [
+    { remaining: 0, original: 1, removed: 1 },
+    { remaining: 0.1, original: 0.5, removed: 0.4 },
+    { remaining: 0.8, original: 0.6, removed: 0 },
+  ])
+  assert.deepEqual(getVoiceComparisonLevels([0, 0, 0, 0], [1, 0.5]).map(value=>value.remaining), [0, 0, 0, 0])
+})
+
+test('reports actual energy reduction even when every region retains some quiet voice', () => {
+  assert.equal(getVocalEnergyReduction([1, 0.5, 0.2], [0.1, 0.05, 0.02]), 99)
+  assert.equal(getVocalEnergyReduction([1, 0.5], [1, 0.5]), 0)
+  assert.equal(getVocalEnergyReduction([1, 0.5], [0, 0]), 100)
+  assert.equal(getVocalEnergyReduction([1], [2]), 0)
+  assert.equal(getVocalEnergyReduction([0], [0]), null)
+  assert.equal(getVocalEnergyReduction([1], []), null)
+})
 
 test('marks every original voice region removed when no voice remains', () => {
   assert.deepEqual(getRemovedVoiceSegments([{ start: 1, end: 3 }, { start: 5, end: 8 }], []), [{ start: 1, end: 3 }, { start: 5, end: 8 }])
